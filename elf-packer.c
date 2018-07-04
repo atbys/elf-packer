@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <elf.h>
 
 #define Elf32_Addr uint32_t
@@ -8,29 +10,8 @@
 #define Elf32_Sword int32_t
 #define Elf32_Word uint32_t
 
-// #define EI_NIDENT 16
-
-/*
-typedef struct {
-	unsigned char e_ident[EI_NIDENT];
-	Elf32_Half       e_type;
-    Elf32_Half       e_machine;
-	Elf32_Word       e_version;
-	Elf32_Addr       e_entry;
-	Elf32_Off        e_phoff;
-	Elf32_Off        e_shoff;
-	Elf32_Word       e_flags;
-	Elf32_Half       e_ehsize;
-	Elf32_Half       e_phentsize;
-	Elf32_Half       e_phnum;
-	Elf32_Half       e_shentsize;
-	Elf32_Half       e_shnum;
-	Elf32_Half       e_shstrndx;
-} Elf32_Ehdr;
-*/
-
 Elf32_Ehdr *get_elf_header(unsigned char *buf){
-	Elf32_Ehdr *header = NULL
+	Elf32_Ehdr *header = NULL;
 
 	header = (Elf32_Ehdr *)buf;
 	if(!(header->e_ident[1]=='E' && header->e_ident[2]=='L' && header->e_ident[3]=='F')){
@@ -43,7 +24,7 @@ Elf32_Ehdr *get_elf_header(unsigned char *buf){
 	return header;
 }
 
-void xor_decoder(unsigned char *start, unsigned int size, BYTE encoder){
+void xor_decoder(unsigned char *start, unsigned int size, unsigned char encoder){
 	unsigned int cnt=0;
 
 	printf("Start Xor Encoder by '0x%X'\n", encoder);
@@ -75,7 +56,7 @@ unsigned int decoder_offset      = 18;
 unsigned int jmp_oep_addr_offset = 27;
 
 void create_decode_stub(unsigned int code_vaddr, unsigned int code_vsize,
-		unsigned int base_addr, BYTE decoder, unsigned int oep)
+		unsigned int base_addr, unsigned char decoder, unsigned int oep)
 {
 		int	cnt=0;
 		int	jmp_len_to_oep=0;
@@ -88,11 +69,11 @@ void create_decode_stub(unsigned int code_vaddr, unsigned int code_vsize,
 		printf("oep     : 0x%08X\n", oep);
 		printf("jmp len : 0x%08X\n", jmp_len_to_oep);
 
-		memcpy(&decode_stub[decode_start_offset], &code_vaddr, sizeof(DWORD));
-		memcpy(&decode_stub[decode_size_offset],  &code_vsize, sizeof(DWORD));
-		memcpy(&decode_stub[base_address_offset],  &base_addr, sizeof(DWORD));
-		memcpy(&decode_stub[decoder_offset],  &decoder, sizeof(BYTE));
-		memcpy(&decode_stub[jmp_oep_addr_offset],  &jmp_len_to_oep, sizeof(DWORD));
+		memcpy(&decode_stub[decode_start_offset], &code_vaddr, sizeof(uint32_t));
+		memcpy(&decode_stub[decode_size_offset],  &code_vsize, sizeof(uint32_t));
+		memcpy(&decode_stub[base_address_offset],  &base_addr, sizeof(uint32_t));
+		memcpy(&decode_stub[decoder_offset],  &decoder, sizeof(unsigned char));
+		memcpy(&decode_stub[jmp_oep_addr_offset],  &jmp_len_to_oep, sizeof(uint32_t));
 
 		return;
 
@@ -102,12 +83,29 @@ Elf32_Shdr *search_oep_include_section_header(Elf32_Ehdr *elf_header, unsigned i
 	int section_num;
 	int cnt=0;
 
-	Elf32_Ehdr *section_header;
-	Elf32_Ehdr *oep_section_header = NULL;
+	Elf32_Shdr *section_header;
+	Elf32_Shdr *oep_section_header = NULL;
 	unsigned int section_vaddr;
 	unsigned int section_vsize;
 
-	section_num = //pass
-	
+	section_num = elf_header->e_shnum;
+	section_header = (Elf32_Shdr *)((unsigned int)elf_header + elf_header->e_shoff);
 
+	for(cnt=0; cnt < section_num; cnt++){
+		section_vaddr = 0; //pass;
+		section_vsize = 0; //pass;
+		//printf("%s vaddr:0x%08X vsize:0x%08X oep:0x%08x\n", section_header->Name, section_vaddr, section_vsize, oep);
+
+		if(section_vaddr <= oep && oep <= section_vaddr + section_vsize && section_header->sh_flags & SHF_EXECINSTR){
+			printf("oep section found\n");
+			oep_section_header = section_header;
+			break;
+		}
+		*section_header++;
+	}
+	return oep_section_header;
+}
+
+int main(){
+	return 0;
 }

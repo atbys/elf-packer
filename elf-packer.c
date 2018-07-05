@@ -4,6 +4,11 @@
 #include <string.h>
 #include <elf.h>
 
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+
 #define Elf32_Addr uint32_t
 #define Elf32_Half uint16_t
 #define Elf32_Off uint32_t
@@ -92,9 +97,9 @@ Elf32_Shdr *search_oep_include_section_header(Elf32_Ehdr *elf_header, unsigned i
 	section_header = (Elf32_Shdr *)((unsigned int)elf_header + elf_header->e_shoff);
 
 	for(cnt=0; cnt < section_num; cnt++){
-		section_vaddr = 0; //pass;
-		section_vsize = 0; //pass;
-		//printf("%s vaddr:0x%08X vsize:0x%08X oep:0x%08x\n", section_header->Name, section_vaddr, section_vsize, oep);
+		section_vaddr = section_header->sh_addr;
+		section_vsize = section_header->sh_size;
+		printf("%s vaddr:0x%08X vsize:0x%08X oep:0x%08x\n", section_header->sh_name, section_vaddr, section_vsize, oep);
 
 		if(section_vaddr <= oep && oep <= section_vaddr + section_vsize && section_header->sh_flags & SHF_EXECINSTR){
 			printf("oep section found\n");
@@ -107,5 +112,50 @@ Elf32_Shdr *search_oep_include_section_header(Elf32_Ehdr *elf_header, unsigned i
 }
 
 int main(){
+	int ret = 0;
+	char *target_filename;
+	char *packed_filename;
+	Elf32_Ehdr *elf_header;
+	Elf32_Shdr *oep_section_header;
+	unsigned char encoder;
+	unsigned int base_addr;
+	unsigned int oep=0;
+	unsigned int section_vaddr;
+	unsigned int section_vsize;
+	unsigned int section_raddr;
+	unsigned int section_rsize;
+	FILE 	*target_bin;
+	unsigned int target_bin_size;
+	struct stat stbuf;
+	unsigned char *target_bin_buffer;
+
+	target_bin = open(target_filename, O_RDONLY);
+	if(target_bin == -1){
+		fprintf(stderr, "fopen failed\n");
+		ret = -1;
+		goto END;
+	}
+
+	fstat(target_bin, &stbuf);
+
+	target_bin_size = stbuf.st_size;
+
+	target_bin_buffer = (unsigned char *)malloc(sizeof(unsigned char) * target_bin_size);
+
+	read(target_bin, target_bin_buffer, target_bin_size);
+
+	elf_header = get_elf_header(target_bin_buffer);
+	oep = elf_header->e_entry;
+
+	oep_section_header = search_oep_include_section_header(elf_header, oep);
+	if(oep_section_header==NULL){
+		printf("OEP include section search failed.\n");
+		goto END;
+	}
+
+	
+	return 0;
+
+	END:
 	return 0;
 }

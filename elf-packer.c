@@ -49,9 +49,22 @@ void dump_ehdr(Elf32_Ehdr *ehdr){
 	printf("\n");
 }
 
-void dumpElfHeader(Elf32_Ehdr *elf_header){
-	printf("Elf Header e_shnum -> %08x\n", elf_header->e_shnum);
-	
+dump_shdr(Elf32_Shdr *shdr, int e_shnum){
+    int i;
+    for (i = 0; i < e_shnum; i++, shdr++) {
+        DUMP(shdr->sh_name);
+        DUMP(shdr->sh_type);
+        DUMP(shdr->sh_flags);
+        DUMP(shdr->sh_addr);
+        DUMP(shdr->sh_offset);
+        DUMP(shdr->sh_size);
+        DUMP(shdr->sh_link);
+        DUMP(shdr->sh_info);
+        DUMP(shdr->sh_addralign);
+        DUMP(shdr->sh_entsize);
+        printf("\n");
+    }
+    printf("\n");
 }
 
 void xor_decoder(unsigned char *start, unsigned int size, unsigned char encoder){
@@ -109,19 +122,21 @@ void create_decode_stub(unsigned int code_vaddr, unsigned int code_vsize,
 
 }
 
-Elf32_Shdr *search_oep_include_section_header(Elf32_Ehdr *elf_header, unsigned int oep){
+Elf32_Shdr *search_oep_include_section_header(Elf32_Ehdr *elf_header, Elf32_Shdr *section_header, unsigned int oep){
 	int section_num;
 	int cnt=0;
 
-	Elf32_Shdr *section_header;
 	Elf32_Shdr *oep_section_header = NULL;
 	unsigned int section_vaddr;
 	unsigned int section_vsize;
 
 	section_num = elf_header->e_shnum;
-	printf("section_num\n");
-	section_header = (Elf32_Shdr *)((unsigned int)elf_header + elf_header->e_shoff);
+	printf("section_num = %08x\n", section_num);
+	//section_header = (Elf32_Shdr *)(&elf_header[elf_header->e_shoff]); //(elf_header + elf_header->e_shoff);
 
+	printf("section_header = %08x\n", section_header);
+	
+	printf("Search!\n");
 	for(cnt=0; cnt < section_num; cnt++){
 		section_vaddr = section_header->sh_addr;
 		section_vsize = section_header->sh_size;
@@ -142,6 +157,7 @@ int main(int argc, char *argv[]){
 	char *target_filename;
 	char *packed_filename;
 	Elf32_Ehdr *elf_header;
+	Elf32_Shdr *section_header;
 	Elf32_Shdr *oep_section_header;
 	unsigned char encoder;
 	unsigned int base_addr;
@@ -154,34 +170,36 @@ int main(int argc, char *argv[]){
 	FILE 	*target_bin;
 	unsigned int target_bin_size;
 	struct stat stbuf;
-	unsigned char *target_bin_buffer;
+	//unsigned char *target_bin_buffer = NULL;
 
 	target_filename = argv[1];
 	packed_filename = argv[2];
 
 	fd= open(target_filename, O_RDONLY);
 	target_bin = fdopen(fd, "rb");
-	if(target_bin == -1){
-		fprintf(stderr, "open failed\n");
-		ret = -1;
-		goto END;
-	}
 
 	fstat(fd, &stbuf);
 
-	target_bin_size = stbuf.st_size;
-	printf("target_bin_size = %08x\n", target_bin_size);
+	//target_bin_size = stbuf.st_size;
+	//printf("target_bin_size = %08x\n", target_bin_size);
 
-	target_bin_buffer = (unsigned char *)malloc(sizeof(unsigned char) * target_bin_size);
+	//target_bin_buffer = (unsigned char *)malloc(sizeof(unsigned char)*stbuf.st_size);
+	
+	unsigned char target_bin_buffer[stbuf.st_size];
 
 	//read(target_bin, target_bin_buffer, target_bin_size);
 	fread(target_bin_buffer, 1, sizeof(target_bin_buffer), target_bin);
 	//elf_header = get_elf_header(target_bin_buffer);
 	elf_header = (Elf32_Ehdr *)target_bin_buffer;
+	section_header = (Elf32_Shdr *)(&target_bin_buffer[elf_header->e_shoff]);
+	
 	dump_ehdr(elf_header);
-	oep = elf_header->e_entry;
+	dump_shdr(section_header, elf_header->e_shnum);
 
-	oep_section_header = search_oep_include_section_header(elf_header, oep);
+	oep = elf_header->e_entry;
+	fclose(target_bin);
+
+	oep_section_header = search_oep_include_section_header(elf_header, section_header, oep);
 	if(oep_section_header==NULL){
 		printf("OEP include section search failed.\n");
 		goto END;
@@ -191,11 +209,11 @@ int main(int argc, char *argv[]){
 	if(target_bin != -1){
 		close(target_bin);
 	}
-
+/*
 	if(target_bin_buffer){
 		free(target_bin_buffer);
 		target_bin_buffer = NULL;
 	}
-
+*/
 	return 0;
 }

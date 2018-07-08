@@ -31,13 +31,32 @@ void dump_ehdr(Elf32_Ehdr *ehdr){
 	printf("\n");
 }
 
+void dump_shdr(Elf32_Shdr *shdr, int e_shnum){
+    int i;
+    for (i = 0; i < e_shnum; i++, shdr++) {
+    	DUMP(shdr->sh_name);
+	    DUMP(shdr->sh_type);
+    	DUMP(shdr->sh_flags);
+		DUMP(shdr->sh_addr);
+    	DUMP(shdr->sh_offset);
+    	DUMP(shdr->sh_size);
+    	DUMP(shdr->sh_link);
+    	DUMP(shdr->sh_info);
+    	DUMP(shdr->sh_addralign);
+    	DUMP(shdr->sh_entsize);
+    	printf("\n");
+    }
+    printf("\n");
+}
+
 int main(int argc, char *argv[]){
 	int fd;
 	FILE *f;
 	unsigned char *filename;
-	unsigned char buf[1024];
+	//unsigned char *buf;
 	struct stat stbuf;
-	Elf32_Ehdr *header;
+	Elf32_Ehdr *ehdr;
+	Elf32_Shdr *shdr;
 	unsigned char *bin_buffer;
 
 	filename = argv[1];
@@ -47,18 +66,16 @@ int main(int argc, char *argv[]){
 
 	fstat(fd, &stbuf);
 	
-	bin_buffer =(unsigned char *)malloc(stbuf.st_size); 
-	//unsigned char buf[stbuf.st_size];
+	//buf = (unsigned char *)malloc(sizeof(unsigned char)*stbuf.st_size); 
+	unsigned char buf[stbuf.st_size];
 	fread(buf, 1, sizeof(buf), f);
-	header = (Elf32_Ehdr *)buf;
-	dump_ehdr(header);
-	if(header == NULL){
-		printf("failed!\n");
-	}else{
-		printf("success\n");
-	}
-	
-	fclose(header);
+	ehdr = (Elf32_Ehdr *)buf;
+	dump_ehdr(ehdr);
+
+	shdr = (Elf32_Shdr *)(&buf[ehdr->e_shoff]);
+	dump_shdr(shdr, ehdr->e_shnum);
+
+	fclose(f);
 	return 0;
 
 }	

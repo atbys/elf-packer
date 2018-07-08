@@ -136,7 +136,7 @@ Elf32_Shdr *search_oep_include_section_header(Elf32_Ehdr *elf_header, Elf32_Shdr
 
 	printf("section_header = %08x\n", section_header);
 	
-	printf("Search!\n");
+	printf("oep section Search!\n");
 	for(cnt=0; cnt < section_num; cnt++){
 		section_vaddr = section_header->sh_addr;
 		section_vsize = section_header->sh_size;
@@ -147,7 +147,7 @@ Elf32_Shdr *search_oep_include_section_header(Elf32_Ehdr *elf_header, Elf32_Shdr
 			oep_section_header = section_header;
 			break;
 		}
-		*section_header++;
+		section_header += elf_header->e_shentsize;
 	}
 	return oep_section_header;
 }

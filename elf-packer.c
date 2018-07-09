@@ -85,15 +85,21 @@ int main(int argc, char *argv[]){
 	Elf32_Shdr *oep_shdr;
 	
 	//address and size
-	unsigned int section_addr;
-	unsigned int section_size;
+	unsigned int section_vaddr;
+	unsigned int section_vsize;
+	unsigned int section_raddr;
+	unsigned int section_rsize;
 	
 	//file buffer
 	char *target_filename;
+	char *packed_filename;
 	int fd;
 	FILE *target_bin;
+	FILE *packed_bin;
 	unsigned int target_bin_size;
 	struct stat stbuf;
+
+	unsigned char encoder;
 
 	target_filename = argv[1];
 
@@ -111,13 +117,40 @@ int main(int argc, char *argv[]){
 	ehdr = (Elf32_Ehdr *)target_bin_buffer;
 	shdr = (Elf32_Shdr *)(&target_bin_buffer[ehdr->e_shoff]);
 	
-	//dump header
 	/*
+	//dump header
 	dump_ehdr(ehdr);
 	dump_shdr(shdr, ehdr->e_shnum);
 	*/
 
 	//oep include section search
 	oep_shdr = search_oep_include_section_header(shdr, ehdr->e_entry, ehdr->e_shnum); 
+	printf("oep section address -> 0x%08x\n", oep_shdr->sh_addr);
+
+	//get oep include section values
+	section_vaddr = oep_shdr->sh_addr;
+	section_vsize = oep_shdr->sh_size;
+	section_raddr = oep_shdr->sh_offset;
+	section_rsize = oep_shdr->sh_size;
+
+	//xor encode
+	encoder = 0xFF;
+	xor_encoder((unsigned char *)(oep_shdr->sh_offset + target_bin_buffer), oep_shdr->sh_size, encoder);
+
+	//create xor decode
+	create_decode_stub(section_vaddr, section_vsize, /*base_addr*/, encoder, oep);
+	memcpy((unsigned char *)(section_raddr + section_vsize + target_bin_buffer), decode_stub, sizeof(decode_stub));
+
+	oep_shdr->sh_size = section_rsize;
+
+	ehdr->e_entry = section_vaddr + section_vsize;
+	//TODO:add write attr code section
+
+	/*
+	packed_bin = fopen(packed_filename, "wb");
+	
+	fwrite(target_bin_buffer, sizeof(target_bin_buffer), 1, packed_bin);	
+	*/
+
 	return 0;
 }

@@ -157,7 +157,13 @@ int main(int argc, char *argv[]){
 
 	unsigned char encoder;
 
+	if(argc < 3){
+		printf("usage: ./a.out target_file packed_file");
+		return -1;
+	}
+
 	target_filename = argv[1];
+	packed_filename = argv[2];
 
 	fd = open(target_filename, O_RDONLY);
 	target_bin = fdopen(fd, "rb");
@@ -200,13 +206,14 @@ int main(int argc, char *argv[]){
 	oep_shdr->sh_size = section_rsize;
 
 	ehdr->e_entry = section_vaddr + section_vsize;
-	//TODO:add write attr code section
+	//add write attr code section
+	oep_shdr->sh_flags |= SHF_WRITE;
 
-	/*
+	
 	packed_bin = fopen(packed_filename, "wb");
 	
 	fwrite(target_bin_buffer, sizeof(target_bin_buffer), 1, packed_bin);	
-	*/
+	
 
 	return 0;
 }

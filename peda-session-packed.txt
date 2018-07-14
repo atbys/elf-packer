@@ -1,1 +1,1 @@
-break *0x80484a2
+break main

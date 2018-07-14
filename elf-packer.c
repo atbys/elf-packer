@@ -90,6 +90,7 @@ void create_decode_stub(unsigned int code_vaddr, unsigned int code_vsize,
 	int	cnt=0;
 	int	jmp_len_to_oep=0;
 
+	//TODO
 	jmp_len_to_oep = oep - (code_vaddr + code_vsize + sizeof(decode_stub));
 
 	printf("start   : 0x%08X\n", code_vaddr);
@@ -108,23 +109,22 @@ void create_decode_stub(unsigned int code_vaddr, unsigned int code_vsize,
 
 }
 
-Elf32_Phdr *search_oep_include_section_header(
-	Elf32_Phdr *shdr, unsigned int oep, unsigned int phnum){
+Elf32_Shdr *search_oep_include_section_header(
+	Elf32_Shdr *shdr, unsigned int oep, unsigned int phnum){
 
-	Elf32_Phdr *oep_shdr = NULL;
+	Elf32_Shdr *oep_shdr = NULL;
 	unsigned int section_addr;
 	unsigned int section_size;
 
 	printf("search oep include section header\n");
 
 	for(int i=0; i < phnum; i++, shdr++){
-		section_addr = shdr->p_vaddr;
-		section_size = shdr->p_memsz;
-		printf("addr:0x%08X size:0x%08X oep:0x%08x\n", shdr->p_vaddr, shdr->p_memsz, oep);
+		section_addr = shdr->sh_addr;
+		section_size = shdr->sh_size;
+		//printf("addr:0x%08X size:0x%08X oep:0x%08x\n", shdr->p_vaddr, shdr->p_memsz, oep);
 		
 		if(section_addr <= oep && 
-			oep <= shdr->p_vaddr + shdr->p_memsz && 
-			shdr->p_flags & PF_X){
+			oep <= section_addr + section_size){
 			printf("oep section found!\n");
 			oep_shdr = shdr;
 			break;
@@ -135,11 +135,39 @@ Elf32_Phdr *search_oep_include_section_header(
 
 }
 
+Elf32_Phdr *search_oep_include_segment_header(
+	Elf32_Phdr *phdr, unsigned int oep, unsigned int phnum){
+
+	Elf32_Phdr *oep_phdr = NULL;
+	unsigned int section_vaddr;
+	unsigned int section_vsize;
+
+	printf("search oep include section header\n");
+
+	for(int i=0; i < phnum; i++, phdr++){
+		section_vaddr = phdr->p_vaddr;
+		section_vsize = phdr->p_memsz;
+		printf("addr:0x%08X size:0x%08X oep:0x%08x\n", section_vaddr, section_vsize, oep);
+		
+		if(section_vaddr <= oep && 
+			oep <= section_vaddr + section_vsize){
+			printf("oep section found!\n");
+			oep_phdr = phdr;
+			break;
+		}
+	}
+
+	return oep_phdr;
+
+}
+
 int main(int argc, char *argv[]){
 	//header 
 	Elf32_Ehdr *ehdr;
-	Elf32_Phdr *shdr;
-	Elf32_Phdr *oep_shdr;
+	Elf32_Shdr *shdr;
+	Elf32_Shdr *oep_shdr;
+	Elf32_Phdr *phdr;
+	Elf32_Phdr *oep_phdr;
 	
 	//address and size
 	unsigned int section_vaddr;
@@ -178,7 +206,8 @@ int main(int argc, char *argv[]){
 	fclose(target_bin);
 
 	ehdr = (Elf32_Ehdr *)target_bin_buffer;
-	shdr = (Elf32_Phdr *)(&target_bin_buffer[ehdr->e_phoff]);
+	shdr = (Elf32_Shdr *)(&target_bin_buffer[ehdr->e_shoff]);
+	phdr = (Elf32_Phdr *)(&target_bin_buffer[ehdr->e_phoff]);
 
 	/*
 	//dump header
@@ -187,28 +216,34 @@ int main(int argc, char *argv[]){
 	*/
 
 	//oep include section search
-	oep_shdr = search_oep_include_section_header(shdr, ehdr->e_entry, ehdr->e_phnum); 
+	oep_shdr = search_oep_include_section_header(shdr, ehdr->e_entry, ehdr->e_shnum); 
+
+	oep_phdr = search_oep_include_segment_header(phdr, ehdr->e_entry, ehdr->e_phnum); 
 	//printf("oep section address -> 0x%08x\n", oep_shdr->p_addr);
 
 	//get oep include section values
-	section_vaddr = oep_shdr->p_vaddr;
-	section_vsize = oep_shdr->p_memsz;
-	section_raddr = oep_shdr->p_paddr;
-	section_rsize = oep_shdr->p_filesz;
+	section_vaddr = oep_shdr->sh_addr;
+	section_vsize = oep_shdr->sh_size;
+	section_raddr = oep_shdr->sh_offset;
+	section_rsize = oep_shdr->sh_size;
 
 	//xor encode
 	encoder = 0xFF;
-	xor_encoder((unsigned char *)(oep_shdr->p_offset + target_bin_buffer), oep_shdr->p_memsz, encoder);
+	xor_encoder((unsigned char *)(oep_shdr->sh_offset + target_bin_buffer), oep_shdr->sh_size, encoder);
 
 	//create xor decode
 	create_decode_stub(section_vaddr, section_vsize, encoder, ehdr->e_entry);
 	memcpy((unsigned char *)(section_raddr + section_vsize + target_bin_buffer), decode_stub, sizeof(decode_stub));
 
-	oep_shdr->p_memsz = section_rsize;
+	oep_shdr->sh_size = section_rsize;
 
 	ehdr->e_entry = section_vaddr + section_vsize;
 	//add write attr code section
-	oep_shdr->p_flags |= PF_W;
+	oep_shdr->sh_flags |= SHF_WRITE;
+	oep_shdr->sh_flags |= SHF_ALLOC;
+	oep_shdr->sh_flags |= SHF_EXECINSTR;
+
+	oep_phdr->p_flags |= PF_W;
 
 	
 	packed_bin = fopen(packed_filename, "wb");

@@ -239,9 +239,9 @@ int main(int argc, char *argv[]){
 
 	ehdr->e_entry = section_vaddr + section_vsize;
 	//add write attr code section
-	oep_shdr->sh_flags |= SHF_WRITE;
-	oep_shdr->sh_flags |= SHF_ALLOC;
-	oep_shdr->sh_flags |= SHF_EXECINSTR;
+	//oep_shdr->sh_flags |= SHF_WRITE;
+	//oep_shdr->sh_flags |= SHF_ALLOC;
+	//oep_shdr->sh_flags |= SHF_EXECINSTR;
 
 	oep_phdr->p_flags |= PF_W;
 

@@ -235,7 +235,7 @@ int main(int argc, char *argv[]){
 	create_decode_stub(section_vaddr, section_vsize, encoder, ehdr->e_entry);
 	memcpy((unsigned char *)(section_raddr + section_vsize + target_bin_buffer), decode_stub, sizeof(decode_stub));
 
-	oep_shdr->sh_size = section_rsize;
+	oep_shdr->sh_size += sizeof(decode_stub);
 
 	ehdr->e_entry = section_vaddr + section_vsize;
 	//add write attr code section
